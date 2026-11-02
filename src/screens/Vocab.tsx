@@ -10,11 +10,22 @@ export function VocabScreen() {
   const file = useRef<HTMLInputElement>(null);
   const learned = allChunks.filter((c) => s.cards[c.id]);
 
-  function download() {
-    const blob = new Blob([exportBackup()], { type: 'application/json' });
+  async function download() {
+    const name = `espanol-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([exportBackup()], name, { type: 'application/json' });
+    // Sur iPhone : la feuille de partage permet « Enregistrer dans Fichiers » (iCloud Drive).
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Sauvegarde Español' });
+        return;
+      } catch {
+        /* partage annulé */
+      }
+      return;
+    }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `madrid-espanol-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`;
+    a.href = URL.createObjectURL(file);
+    a.download = name;
     a.click();
   }
 
@@ -47,7 +58,7 @@ export function VocabScreen() {
 
       <section className="card">
         <h2>Sauvegarde</h2>
-        <p className="muted">Votre progression est stockée uniquement sur ce téléphone. Exportez-la chaque semaine dans Fichiers → iCloud Drive.</p>
+        <p className="muted">Votre progression est stockée uniquement sur ce téléphone. Chaque semaine, exportez-la puis choisissez « Enregistrer dans Fichiers » → iCloud Drive.</p>
         <div className="row">
           <button className="btn ghost grow" onClick={download}>Exporter</button>
           <button className="btn ghost grow" onClick={() => file.current?.click()}>Importer</button>
