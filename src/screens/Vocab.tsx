@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { State } from 'ts-fsrs';
 import { allChunks } from '../data/missions';
 import { Gendered, SpeakButton } from '../components/ui';
+import { VoiceSettings } from '../components/VoiceSettings';
 import { exportBackup, importBackup, resetAll, useAppState } from '../lib/store';
 import { intervalLabel, isSolid } from '../lib/srs';
 
@@ -55,6 +56,11 @@ export function VocabScreen() {
           })}
         </ul>
       )}
+
+      <section className="card">
+        <h2>Voix</h2>
+        <VoiceSettings />
+      </section>
 
       <section className="card">
         <h2>Sauvegarde</h2>

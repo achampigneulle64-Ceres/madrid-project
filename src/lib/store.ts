@@ -14,6 +14,8 @@ export interface AppState {
   createdAt: string;
   departure: string; // AAAA-MM
   dailyGoalMin: number;
+  /** Préférences de voix (identifiants voiceURI) et débit de lecture. */
+  voice?: { main?: string; second?: string; rate?: number };
   cards: Record<string, Card>;
   missions: Record<string, { completedAt: string; score: number }>;
   daily: Record<string, number>; // AAAA-MM-JJ → secondes actives
