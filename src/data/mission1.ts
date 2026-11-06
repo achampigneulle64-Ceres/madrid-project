@@ -49,14 +49,14 @@ export const mission1: Mission = {
     { kind: 'order', chunk: 'm01c05', fr: 'Vous me mettez une portion de patatas bravas ?', prefix: '¿', tokens: ['Me', 'pone', 'una', 'ración', 'de', 'patatas bravas'], suffix: '?' },
     { kind: 'gender', noun: 'tapa', fr: 'petite portion', answer: 'una' },
     { kind: 'gender', noun: 'bocadillo', fr: 'sandwich', answer: 'un' },
-    { kind: 'translate', chunk: 'm01c12', fr: 'L’addition, s’il vous plaît.', accepted: ['La cuenta, por favor.'] },
-    { kind: 'translate', chunk: 'm01c09', fr: 'C’est combien ?', accepted: ['¿Cuánto es?'] },
+    { kind: 'translate', chunk: 'm01c12', fr: 'L’addition, s’il vous plaît.', accepted: ['La cuenta, por favor.', 'La cuenta, por favor, gracias.'] },
+    { kind: 'translate', chunk: 'm01c09', fr: 'C’est combien ?', accepted: ['¿Cuánto es?', '¿Cuánto cuesta?'] },
     { kind: 'order', chunk: 'm01c04', fr: 'Pour moi, un café au lait.', tokens: ['Para mí,', 'un', 'café', 'con', 'leche.'] },
     { kind: 'translate', chunk: 'm01c08', fr: 'Ce sera tout, merci.', accepted: ['Nada más, gracias.'] },
     { kind: 'shadow', chunk: 'm01c03' },
     { kind: 'shadow', chunk: 'm01c05' },
     { kind: 'shadow', chunk: 'm01c11' },
-    { kind: 'translate', chunk: 'm01c03', fr: 'Je voudrais une bière pression, s’il vous plaît.', accepted: ['Quería una caña, por favor.', 'Quisiera una caña, por favor.'] },
+    { kind: 'translate', chunk: 'm01c03', fr: 'Je voudrais une bière pression, s’il vous plaît.', accepted: ['Quería una caña, por favor.', 'Quisiera una caña, por favor.', 'Quiero una caña, por favor.', 'Una caña, por favor.'] },
   ],
   roleplay: [
     {

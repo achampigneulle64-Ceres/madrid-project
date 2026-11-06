@@ -6,7 +6,7 @@ import { IconCheck, IconClose, IconCross, IconPin, IconPlay } from '../component
 import { speak, stopSpeaking } from '../lib/speech';
 import { logError, update } from '../lib/store';
 import { grade, Rating } from '../lib/srs';
-import { check, shuffle } from '../lib/text';
+import { evaluate, shuffle, type Verdict } from '../lib/text';
 
 type Step = 'intro' | 'dialogue' | 'grammar' | 'chunks' | 'ex' | 'roleplay' | 'bilan';
 const STEPS: Step[] = ['intro', 'dialogue', 'grammar', 'chunks', 'ex', 'roleplay', 'bilan'];
@@ -39,13 +39,12 @@ export function MissionScreen({ mission, onExit }: { mission: M; onExit: () => v
     window.scrollTo(0, 0);
   };
 
-  function record(ok: boolean, cat: ErrorCat, item: string, chunk?: string) {
+  /** soft = réussi avec aide (2e essai) : compte comme réussi, mais la phrase reviendra plus tôt en révision. */
+  function record(ok: boolean, cat: ErrorCat, item: string, chunk?: string, soft = false) {
     setResult((r) => {
       const n: Result = { ...r, total: r.total + 1, ok: r.ok + (ok ? 1 : 0), byCat: { ...r.byCat }, missedChunks: new Set(r.missedChunks) };
-      if (!ok) {
-        n.byCat[cat] = (n.byCat[cat] ?? 0) + 1;
-        if (chunk) n.missedChunks.add(chunk);
-      }
+      if (!ok) n.byCat[cat] = (n.byCat[cat] ?? 0) + 1;
+      if ((!ok || soft) && chunk) n.missedChunks.add(chunk);
       return n;
     });
     if (!ok) logError(cat, item, session);
@@ -244,13 +243,13 @@ function ChunksStep({ mission, onNext }: { mission: M; onNext: () => void }) {
 /* ───────── 4. Exercices ───────── */
 type Feedback = { ok: boolean; title: string; detail?: string; answer?: string } | null;
 
-function ExercisesStep({ exercises, record, session, onNext }: { exercises: Exercise[]; record: (ok: boolean, cat: ErrorCat, item: string, chunk?: string) => void; session: string; onNext: () => void }) {
+function ExercisesStep({ exercises, record, session, onNext }: { exercises: Exercise[]; record: (ok: boolean, cat: ErrorCat, item: string, chunk?: string, soft?: boolean) => void; session: string; onNext: () => void }) {
   const [i, setI] = useState(0);
   const [fb, setFb] = useState<Feedback>(null);
   const ex = exercises[i];
 
-  function answered(f: NonNullable<Feedback>, cat: ErrorCat, item: string, chunk?: string) {
-    record(f.ok, cat, item, chunk);
+  function answered(f: NonNullable<Feedback>, cat: ErrorCat, item: string, chunk?: string, soft = false) {
+    record(f.ok, cat, item, chunk, soft);
     setFb(f);
     if (chunk && chunkById[chunk]) speak(chunkById[chunk].es);
   }
@@ -267,18 +266,30 @@ function ExercisesStep({ exercises, record, session, onNext }: { exercises: Exer
       <div className="card ex" key={i}>
         {ex.kind === 'listen' && <ListenEx ex={ex} locked={!!fb} onAnswer={(ok) => answered({ ok, title: ok ? '¡Muy bien!' : 'Pas tout à fait', answer: `${chunkById[ex.chunk].es} = ${ex.options[ex.answer]}` }, 'Compréhension orale', chunkById[ex.chunk].es, ex.chunk)} />}
         {ex.kind === 'gender' && <GenderEx ex={ex} locked={!!fb} onAnswer={(ok) => answered({ ok, title: ok ? '¡Exacto!' : 'Attention au genre', answer: `${ex.answer} ${ex.noun}`, detail: genderWhy(ex.noun) }, 'Genre (un / una)', ex.noun)} />}
-        {ex.kind === 'order' && <OrderEx ex={ex} locked={!!fb} onAnswer={(ok) => answered({ ok, title: ok ? '¡Perfecto!' : 'L’ordre n’est pas le bon', answer: chunkById[ex.chunk].es }, 'Ordre des mots', chunkById[ex.chunk].es, ex.chunk)} />}
+        {ex.kind === 'order' && <OrderEx ex={ex} locked={!!fb} onAnswer={(ok, second) => answered({ ok, title: ok ? (second ? 'Réussi au deuxième essai' : '¡Perfecto!') : 'Voici le bon ordre', answer: chunkById[ex.chunk].es }, 'Ordre des mots', chunkById[ex.chunk].es, ex.chunk, ok && second)} />}
         {ex.kind === 'translate' && (
           <TranslateEx
             ex={ex}
             locked={!!fb}
-            onAnswer={(res) => {
+            onAnswer={(v, second) => {
               const c = chunkById[ex.chunk];
-              if (res === 'ok') answered({ ok: true, title: '¡Perfecto!', answer: c.es }, 'Production écrite', c.es, ex.chunk);
-              else if (res === 'accents') {
-                answered({ ok: true, title: 'Presque parfait : attention aux accents', answer: c.es, detail: 'Le sens est juste ; seuls les accents ou le ñ manquent. Sur iPhone : appui long sur la lettre.' }, 'Production écrite', c.es, ex.chunk);
-                logError('Accents et ñ', c.es, session);
-              } else answered({ ok: false, title: 'Voici la bonne réponse', answer: c.es, detail: 'Lisez-la, écoutez-la, puis répétez-la à voix haute.' }, 'Production écrite', c.es, ex.chunk);
+              const ok = v.level !== 'wrong';
+              const titles: Record<Verdict['level'], string> = {
+                exact: second ? 'Réussi au deuxième essai' : '¡Perfecto!',
+                accents: 'Juste. Attention aux accents',
+                typo: 'Juste, à une petite faute près',
+                polite: 'Juste. N’oubliez pas la politesse',
+                wrong: 'Voici la bonne réponse',
+              };
+              const details: Record<Verdict['level'], string | undefined> = {
+                exact: undefined,
+                accents: 'Le sens est juste ; seuls les accents ou le ñ manquent. Sur iPhone : appui long sur la lettre.',
+                typo: 'Comparez avec la forme exacte ci-dessus.',
+                polite: 'La phrase est correcte ; avec « por favor » ou « gracias », elle sonne plus naturelle.',
+                wrong: 'Lisez-la, écoutez-la, puis répétez-la à voix haute. Elle reviendra bientôt en révision.',
+              };
+              answered({ ok, title: titles[v.level], answer: v.expected, detail: details[v.level] }, 'Production écrite', c.es, ex.chunk, ok && (second || v.level === 'typo'));
+              if (v.level === 'accents') logError('Accents et ñ', c.es, session);
             }}
           />
         )}
@@ -352,7 +363,8 @@ function GenderEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'gen
   );
 }
 
-function OrderEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'order' }>; locked: boolean; onAnswer: (ok: boolean) => void }) {
+function OrderEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'order' }>; locked: boolean; onAnswer: (ok: boolean, second: boolean) => void }) {
+  const [tries, setTries] = useState(0);
   const pool = useMemo(() => {
     const idx = ex.tokens.map((_, k) => k);
     let s = shuffle(idx);
@@ -380,15 +392,43 @@ function OrderEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'orde
           <button key={k} className="tok" disabled={locked} onClick={() => setChosen([...chosen, k])}>{ex.tokens[k]}</button>
         ))}
       </div>
+      {tries === 1 && !locked && <p className="retry">Pas encore. Le premier bloc est en place : réessayez.</p>}
       {!locked && (
-        <button className="btn primary block" disabled={!done} onClick={() => onAnswer(chosen.every((v, k) => v === k))}>Vérifier</button>
+        <button
+          className="btn primary block"
+          disabled={!done}
+          onClick={() => {
+            const ok = chosen.every((v, k) => v === k);
+            if (!ok && tries === 0) {
+              setTries(1);
+              setChosen([0]);
+              return;
+            }
+            onAnswer(ok, tries > 0);
+          }}
+        >
+          Vérifier
+        </button>
       )}
     </>
   );
 }
 
-function TranslateEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'translate' }>; locked: boolean; onAnswer: (r: 'ok' | 'accents' | 'wrong') => void }) {
+function TranslateEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'translate' }>; locked: boolean; onAnswer: (v: Verdict, second: boolean) => void }) {
   const [val, setVal] = useState('');
+  const [hint, setHint] = useState<string | null>(null);
+
+  function submit(giveUp = false) {
+    const v: Verdict = giveUp ? { level: 'wrong', expected: ex.accepted[0] } : evaluate(val, ex.accepted);
+    if (v.level === 'wrong' && !hint && !giveUp) {
+      // Premier essai manqué : un indice, et une seconde chance.
+      const words = v.expected.replace(/^[¿¡]/, '').split(' ');
+      setHint(`Indice : la phrase compte ${words.length} mots et commence par « ${v.expected.split(' ')[0]} ».`);
+      return;
+    }
+    onAnswer(v, !!hint);
+  }
+
   return (
     <>
       <div className="ex-type">Écrire</div>
@@ -404,19 +444,21 @@ function TranslateEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: '
         autoCorrect="off"
         spellCheck={false}
         lang="es"
-        onKeyDown={(e) => { if (e.key === 'Enter' && val.trim()) onAnswer(check(val, ex.accepted)); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && val.trim()) submit(); }}
       />
       <div className="accent-keys">
         {['á', 'é', 'í', 'ó', 'ú', 'ñ', '¿', '¡'].map((k) => (
           <button key={k} className="key" disabled={locked} onClick={() => setVal(val + k)}>{k}</button>
         ))}
       </div>
+      {hint && !locked && <p className="retry">Pas encore. {hint}</p>}
       {!locked && (
         <div className="row">
-          <button className="btn ghost" onClick={() => onAnswer('wrong')}>Je ne sais pas</button>
-          <button className="btn primary grow" disabled={!val.trim()} onClick={() => onAnswer(check(val, ex.accepted))}>Vérifier</button>
+          <button className="btn ghost" onClick={() => submit(true)}>Voir la réponse</button>
+          <button className="btn primary grow" disabled={!val.trim()} onClick={() => submit()}>{hint ? 'Réessayer' : 'Vérifier'}</button>
         </div>
       )}
+      <p className="hint small">Majuscules et ponctuation ne comptent pas. Une petite faute de frappe ou un accent oublié est accepté.</p>
     </>
   );
 }
@@ -528,9 +570,9 @@ function Bilan({ mission, result, onFinish }: { mission: M; result: Result; onFi
     <section>
       <div className="card hero center">
         <div className="big-score">{score} %</div>
-        <h2>{score >= 85 ? '¡Misión cumplida!' : score >= 60 ? '¡Bien hecho!' : 'Bon début'}</h2>
+        <h2>{score >= 85 ? '¡Misión cumplida!' : score >= 60 ? '¡Bien hecho!' : 'Mission validée'}</h2>
         <p>Vous savez maintenant commander, demander le prix et payer dans un bar espagnol.</p>
-        <p className="hint">Prochain test grandeur nature : votre prochain café à Madrid.</p>
+        <p className="hint">{score >= 60 ? 'Prochain test grandeur nature : votre prochain café à Madrid.' : 'Pas de score minimum : la mission suivante est débloquée. Les phrases difficiles reviendront plus souvent en révision.'}</p>
       </div>
       <div className="card">
         <h3>À retravailler</h3>

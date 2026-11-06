@@ -151,15 +151,18 @@ export function Dashboard({ openMission, openReview }: { openMission: (id: strin
           {a1Path.map((p) => {
             const mis = missions.find((x) => x.number === p.number);
             const done = mis && s.missions[mis.id];
-            const state = done ? 'done' : mis ? 'current' : 'locked';
+            const prev = missions.find((x) => x.number === p.number - 1);
+            const unlocked = p.number === 1 || (!!prev && !!s.missions[prev.id]);
+            const state = done ? 'done' : mis && unlocked ? 'current' : 'locked';
+            const why = !unlocked ? `après la mission ${p.number - 1}` : !mis ? 'en préparation' : '';
             return (
-              <li key={p.number} className={state} onClick={() => mis && openMission(mis.id)}>
+              <li key={p.number} className={state} onClick={() => mis && (done || unlocked) && openMission(mis.id)}>
                 <span className="stop">{done ? <IconCheck size={14} /> : p.number}</span>
                 <div className="stop-body">
                   <div className="stop-title">{p.titleEs}</div>
                   <div className="stop-sub">{p.title}, {p.place}</div>
                 </div>
-                {done ? <span className="stop-score">{done.score} %</span> : state === 'locked' ? <IconLock size={16} className="stop-lock" /> : <span className="stop-go">Ouvrir</span>}
+                {done ? <span className="stop-score">{done.score} %</span> : state === 'locked' ? <span className="stop-why"><IconLock size={14} /> {why}</span> : <span className="stop-go">Ouvrir</span>}
               </li>
             );
           })}
