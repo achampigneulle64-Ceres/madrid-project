@@ -365,3 +365,5 @@ b { font-weight: 650; }
 .sync-steps a { color: var(--cobalt); font-weight: 600; }
 .sync code { background: var(--paper); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
 .small-link { font-size: 14px; margin-top: 14px; display: block; }
+.agree-q { font-size: 26px; }
+.options.two .agree-opt { font-size: 19px; font-stretch: 105%; }

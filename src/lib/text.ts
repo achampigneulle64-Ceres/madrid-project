@@ -41,7 +41,15 @@ function articleMismatch(a: string, b: string) {
   const ta = a.split(' '), tb = b.split(' ');
   const artsA = ta.filter((w) => ARTICLES.has(w)).join(' ');
   const artsB = tb.filter((w) => ARTICLES.has(w)).join(' ');
-  return artsA !== artsB;
+  if (artsA !== artsB) return true;
+  // Accord masculin / féminin : francés/francesa, mexicano/mexicana, español/española…
+  if (ta.length !== tb.length) return false;
+  return ta.some((x, i) => {
+    const y = tb[i];
+    if (x === y) return false;
+    const fem = (m: string, f: string) => (m.endsWith('o') && f === m.slice(0, -1) + 'a') || f === m + 'a' || (m.endsWith('es') && f === m + 'a');
+    return fem(x, y) || fem(y, x);
+  });
 }
 
 /** Tolérance : 1 faute pour 8 caractères (au moins 1). */

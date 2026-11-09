@@ -1,7 +1,8 @@
 import type { MissionStub } from './types';
 import { mission1 } from './mission1';
+import { mission2 } from './mission2';
 
-export const missions = [mission1];
+export const missions = [mission1, mission2];
 
 /** Parcours A1 (missions 2 à 8 : contenu à venir). */
 export const a1Path: MissionStub[] = [

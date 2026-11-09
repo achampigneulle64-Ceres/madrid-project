@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ErrorCat, Exercise, Mission as M, RoleplayStep } from '../data/types';
+import type { ErrorCat, Exercise, GrammarSection, Mission as M, RoleplayStep } from '../data/types';
+import { Rich } from '../components/Rich';
 import { chunkById } from '../data/missions';
 import { Gendered, Progress, Recorder, SpeakButton, useActiveTimer } from '../components/ui';
 import { IconCheck, IconClose, IconCross, IconPin, IconPlay } from '../components/icons';
@@ -84,9 +85,9 @@ export function MissionScreen({ mission, onExit }: { mission: M; onExit: () => v
           </div>
           <ol className="steps-preview">
             <li>Écouter la scène</li>
-            <li>Comprendre comment on commande</li>
-            <li>Découvrir les 12 phrases clés</li>
-            <li>S’entraîner : écoute, genre, construction, traduction, prononciation</li>
+            <li>{mission.understand}</li>
+            <li>Découvrir les {mission.chunks.length} phrases clés</li>
+            <li>S’entraîner : écoute, accords, construction, écriture, prononciation</li>
             <li>Jouer la scène</li>
           </ol>
           <p className="hint">Durée : 20 à 30 min. Vous pouvez la faire en deux fois.</p>
@@ -95,10 +96,10 @@ export function MissionScreen({ mission, onExit }: { mission: M; onExit: () => v
       )}
 
       {step === 'dialogue' && <DialogueStep mission={mission} onNext={next} />}
-      {step === 'grammar' && <GrammarStep onNext={next} />}
+      {step === 'grammar' && <GrammarStep sections={mission.grammar} onNext={next} />}
       {step === 'chunks' && <ChunksStep mission={mission} onNext={next} />}
       {step === 'ex' && <ExercisesStep exercises={mission.exercises} record={record} session={session} onNext={next} />}
-      {step === 'roleplay' && <RoleplayStepView steps={mission.roleplay} record={record} onNext={next} />}
+      {step === 'roleplay' && <RoleplayStepView steps={mission.roleplay} partner={mission.partner} record={record} onNext={next} />}
       {step === 'bilan' && <Bilan mission={mission} result={result} onFinish={finish} />}
     </div>
   );
@@ -114,7 +115,7 @@ function DialogueStep({ mission, onNext }: { mission: M; onNext: () => void }) {
     for (let i = 0; i < mission.dialogue.length; i++) {
       setCurrent(i);
       const l = mission.dialogue[i];
-      await speak(l.es, { voice: l.who === 'camarero' ? 0 : 1, slow });
+      await speak(l.es, { voice: l.who === 'Vous' ? 1 : 0, slow });
       await new Promise((r) => setTimeout(r, 350));
     }
     setCurrent(null);
@@ -133,8 +134,8 @@ function DialogueStep({ mission, onNext }: { mission: M; onNext: () => void }) {
       </div>
       <div className="dialogue">
         {mission.dialogue.map((l, i) => (
-          <div key={i} className={`bubble ${l.who === 'tú' ? 'me' : 'them'} ${current === i ? 'active' : ''}`} onClick={() => speak(l.es, { voice: l.who === 'camarero' ? 0 : 1, slow })}>
-            <div className="who">{l.who === 'tú' ? 'Vous' : 'Le serveur'}</div>
+          <div key={i} className={`bubble ${l.who === 'Vous' ? 'me' : 'them'} ${current === i ? 'active' : ''}`} onClick={() => speak(l.es, { voice: l.who === 'Vous' ? 1 : 0, slow })}>
+            <div className="who">{l.who}</div>
             <div className="es">{l.es}</div>
             {showFr && <div className="fr">{l.fr}</div>}
           </div>
@@ -147,66 +148,45 @@ function DialogueStep({ mission, onNext }: { mission: M; onNext: () => void }) {
 }
 
 /* ───────── 2. Grammaire visuelle ───────── */
-function GrammarStep({ onNext }: { onNext: () => void }) {
+function GrammarStep({ sections, onNext }: { sections: GrammarSection[]; onNext: () => void }) {
   return (
     <section>
-      <div className="card">
-        <h2>Commander poliment : 3 formules</h2>
-        <table className="formula">
-          <tbody>
-            <tr>
-              <td><b className="hl">Quería</b> + chose</td>
-              <td>Je voudrais…</td>
-            </tr>
-            <tr>
-              <td><b className="hl">¿Me pone</b> + chose<b className="hl">?</b></td>
-              <td>Vous me mettez… ?</td>
-            </tr>
-            <tr>
-              <td><b className="hl">Para mí,</b> + chose</td>
-              <td>Pour moi, …</td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="tip">
-          <b>Comme en français</b>
-          <p><i>Quería</i> signifie mot à mot « je voulais ». Comme en français, ce temps du passé adoucit la demande. <i>Quiero</i> (« je veux ») est correct, mais plus direct.</p>
+      {sections.map((sec) => (
+        <div className="card" key={sec.title}>
+          <h2>{sec.title}</h2>
+          {sec.blocks.map((b, k) => {
+            if (b.kind === 'table')
+              return (
+                <table className="formula" key={k}>
+                  <tbody>
+                    {b.rows.map(([es, fr]) => (
+                      <tr key={es}><td><Rich text={es} /></td><td>{fr}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            if (b.kind === 'gender')
+              return (
+                <div className="gender-grid" key={k}>
+                  <div className="col masc-bg">
+                    <div className="col-title"><Rich text={b.mascLabel} /></div>
+                    {b.masc.map((w) => <div key={w}><Rich text={w} /></div>)}
+                  </div>
+                  <div className="col fem-bg">
+                    <div className="col-title"><Rich text={b.femLabel} /></div>
+                    {b.fem.map((w) => <div key={w}><Rich text={w} /></div>)}
+                  </div>
+                </div>
+              );
+            return (
+              <div className={`tip ${b.tone ?? ''}`} key={k}>
+                <b>{b.title}</b>
+                <p><Rich text={b.text} /></p>
+              </div>
+            );
+          })}
         </div>
-        <div className="tip mx">
-          <b>Au Mexique</b>
-          <p>On dira plutôt <i>¿Me da…?</i> (« vous me donnez… ? ») que <i>¿Me pone…?</i>.</p>
-        </div>
-      </div>
-
-      <div className="card">
-        <h2>Un ou una ? Le genre en couleur</h2>
-        <div className="gender-grid">
-          <div className="col masc-bg">
-            <div className="col-title"><b className="masc">un</b> · masculin</div>
-            <div>un caf<b>é</b></div>
-            <div>un vin<b>o</b></div>
-            <div>un bocadill<b>o</b></div>
-          </div>
-          <div className="col fem-bg">
-            <div className="col-title"><b className="fem">una</b> · féminin</div>
-            <div>una cañ<b>a</b></div>
-            <div>una tap<b>a</b></div>
-            <div>una rac<b>ión</b></div>
-          </div>
-        </div>
-        <div className="tip">
-          <b>Règle pratique</b>
-          <p>Les mots en <b className="masc">-o</b> sont presque toujours masculins. Ceux en <b className="fem">-a</b> et en <b className="fem">-ión</b> sont presque toujours féminins.</p>
-        </div>
-        <div className="tip warn">
-          <b>Piège pour les francophones</b>
-          <p><i>La leche</i> (le lait) est <b className="fem">féminin</b> en espagnol. Le genre ne suit pas toujours le français.</p>
-        </div>
-        <div className="tip">
-          <b>Tu ou vous ?</b>
-          <p>Le serveur dit <i>¿Qué <b>te</b> pongo?</i> : il vous tutoie, c’est normal en Espagne. Vous pouvez répondre <i>¿Me pone…?</i> (vouvoiement), les deux coexistent.</p>
-        </div>
-      </div>
+      ))}
       <button className="btn primary block" onClick={onNext}>Voir les phrases clés</button>
     </section>
   );
@@ -217,7 +197,7 @@ function ChunksStep({ mission, onNext }: { mission: M; onNext: () => void }) {
   return (
     <section>
       <div className="card">
-        <h2>Les 12 phrases clés</h2>
+        <h2>Les {mission.chunks.length} phrases clés</h2>
         <p className="hint">Pour chacune : écoutez, répétez à voix haute, puis réécoutez la version lente. Elles entreront ensuite dans vos révisions.</p>
       </div>
       <ul className="chunk-list">
@@ -293,6 +273,7 @@ function ExercisesStep({ exercises, record, session, onNext }: { exercises: Exer
             }}
           />
         )}
+        {ex.kind === 'agree' && <AgreeEx ex={ex} locked={!!fb} onAnswer={(ok) => answered({ ok, title: ok ? '¡Exacto!' : 'Attention à l’accord', answer: ex.sentence.replace('___', ex.options[ex.answer]), detail: ex.why }, 'Accord masculin / féminin', ex.sentence)} />}
         {ex.kind === 'shadow' && <ShadowEx ex={ex} onDone={go} />}
       </div>
       {fb && (
@@ -356,6 +337,28 @@ function GenderEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'gen
         {(['un', 'una'] as const).map((g) => (
           <button key={g} disabled={locked} className={`opt ${g === 'un' ? 'masc-btn' : 'fem-btn'} ${picked === g ? (g === ex.answer ? 'right' : 'wrong') : ''}`} onClick={() => { setPicked(g); onAnswer(g === ex.answer); }}>
             {g}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function AgreeEx({ ex, locked, onAnswer }: { ex: Extract<Exercise, { kind: 'agree' }>; locked: boolean; onAnswer: (ok: boolean) => void }) {
+  const [picked, setPicked] = useState<0 | 1 | null>(null);
+  const [before, after] = ex.sentence.split('___');
+  return (
+    <>
+      <div className="ex-type">Accord</div>
+      <h3>Masculin ou féminin ?</h3>
+      <div className="gender-q agree-q">
+        {before}<span className={`slot ${picked === null ? '' : picked === 0 ? 'masc' : 'fem'}`}>{picked === null ? '___' : ex.options[picked]}</span>{after}
+        <div className="fr">({ex.fr})</div>
+      </div>
+      <div className="options two">
+        {ex.options.map((o, k) => (
+          <button key={o} disabled={locked} className={`opt agree-opt ${k === 0 ? 'masc-btn' : 'fem-btn'} ${picked === k ? (k === ex.answer ? 'right' : 'wrong') : ''} ${locked && k === ex.answer ? 'right' : ''}`} onClick={() => { setPicked(k as 0 | 1); onAnswer(k === ex.answer); }}>
+            {o}
           </button>
         ))}
       </div>
@@ -490,7 +493,7 @@ function ShadowEx({ ex, onDone }: { ex: Extract<Exercise, { kind: 'shadow' }>; o
 }
 
 /* ───────── 5. Jeu de rôle ───────── */
-function RoleplayStepView({ steps, record, onNext }: { steps: RoleplayStep[]; record: (ok: boolean, cat: ErrorCat, item: string) => void; onNext: () => void }) {
+function RoleplayStepView({ steps, partner, record, onNext }: { steps: RoleplayStep[]; partner: string; record: (ok: boolean, cat: ErrorCat, item: string) => void; onNext: () => void }) {
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [firstTry, setFirstTry] = useState(true);
@@ -534,7 +537,7 @@ function RoleplayStepView({ steps, record, onNext }: { steps: RoleplayStep[]; re
         ))}
         {s.waiter && (
           <div className="bubble them active" onClick={() => speak(s.waiter!)}>
-            <div className="who">Le serveur</div>
+            <div className="who">{partner}</div>
             <div className="es">{s.waiter}</div>
             {s.waiterFr && <div className="fr">{s.waiterFr}</div>}
           </div>
@@ -571,7 +574,7 @@ function Bilan({ mission, result, onFinish }: { mission: M; result: Result; onFi
       <div className="card hero center">
         <div className="big-score">{score} %</div>
         <h2>{score >= 85 ? '¡Misión cumplida!' : score >= 60 ? '¡Bien hecho!' : 'Mission validée'}</h2>
-        <p>Vous savez maintenant commander, demander le prix et payer dans un bar espagnol.</p>
+        <p>{mission.outcome}</p>
         <p className="hint">{score >= 60 ? 'Prochain test grandeur nature : votre prochain café à Madrid.' : 'Pas de score minimum : la mission suivante est débloquée. Les phrases difficiles reviendront plus souvent en révision.'}</p>
       </div>
       <div className="card">
