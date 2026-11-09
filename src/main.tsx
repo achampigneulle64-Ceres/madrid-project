@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { startUpdates } from './lib/update';
+
+startUpdates();
 
 // Demande au navigateur de ne pas effacer les données locales.
 navigator.storage?.persist?.().catch(() => {});

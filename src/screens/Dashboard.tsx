@@ -175,7 +175,7 @@ export function Dashboard({ openMission, openReview }: { openMission: (id: strin
           </li>
         </ol>
       </section>
-      <p className="footer">Prototype 0.1. Votre progression reste sur cet appareil.</p>
+      <p className="footer">Version {__APP_VERSION__} du {__APP_BUILT__}. Votre progression reste sur cet appareil.</p>
     </div>
   );
 }

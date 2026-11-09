@@ -1,21 +1,23 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { viteSingleFile } from 'vite-plugin-singlefile'
+import { readFileSync } from 'node:fs'
 
-// SINGLE=1 → un seul fichier HTML autonome (prévisualisation dans Claude).
-// Sinon → web app installable et utilisable hors ligne (GitHub Pages).
-const single = !!process.env.SINGLE
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
+
+const built = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' })
 
 export default defineConfig({
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version.replace(/\.0$/, '')),
+    __APP_BUILT__: JSON.stringify(built),
+  },
   plugins: [
     react(),
-    ...(single
-      ? [viteSingleFile()]
-      : [
           VitePWA({
-            registerType: 'autoUpdate',
+            registerType: 'prompt',
+            injectRegister: false,
             includeAssets: ['apple-touch-icon.png', 'favicon-64.png'],
             manifest: {
               name: 'Madrid · Español',
@@ -39,6 +41,5 @@ export default defineConfig({
               cleanupOutdatedCaches: true,
             },
           }),
-        ]),
   ],
 })

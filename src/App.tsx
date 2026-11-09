@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { setBusy } from './lib/update';
 import { missions } from './data/missions';
 import { Dashboard } from './screens/Dashboard';
 import { MissionScreen } from './screens/Mission';
@@ -11,6 +12,7 @@ type View = { name: 'home' } | { name: 'vocab' } | { name: 'review' } | { name: 
 export default function App() {
   const [view, setView] = useState<View>({ name: 'home' });
   const home = () => { setView({ name: 'home' }); window.scrollTo(0, 0); };
+  useEffect(() => setBusy(view.name === 'mission' || view.name === 'review'), [view.name]);
 
   if (view.name === 'mission') {
     const m = missions.find((x) => x.id === view.id)!;
