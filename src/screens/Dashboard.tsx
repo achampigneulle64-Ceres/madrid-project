@@ -1,18 +1,22 @@
 import { a1Path, missions } from '../data/missions';
 import { IconCheck, IconLock, IconPlane } from '../components/icons';
-import { persistentDifficulties, today, useAppState } from '../lib/store';
+import { dailyTotals, persistentDifficulties, today, useAppState } from '../lib/store';
 import { isDue, isSolid } from '../lib/srs';
+import { useSyncStatus } from '../lib/sync';
+import { since } from '../components/SyncSettings';
 
 const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
 export function Dashboard({ openMission, openReview }: { openMission: (id: string) => void; openReview: () => void }) {
   const s = useAppState();
+  const sync = useSyncStatus();
   const now = new Date();
   const cards = Object.values(s.cards);
   const due = cards.filter((c) => isDue(c, now)).length;
   const solid = cards.filter(isSolid).length;
-  const minToday = Math.floor((s.daily[today()] ?? 0) / 60);
-  const totalMin = Math.floor(Object.values(s.daily).reduce((a, b) => a + b, 0) / 60);
+  const daily = dailyTotals(s);
+  const minToday = Math.floor((daily[today()] ?? 0) / 60);
+  const totalMin = Math.floor(Object.values(daily).reduce((a, b) => a + b, 0) / 60);
   const doneMissions = Object.keys(s.missions).length;
   const a1Chunks = a1Path.length * 12;
   const a1Progress = Math.min(1, 0.6 * (doneMissions / a1Path.length) + 0.4 * (solid / a1Chunks));
@@ -21,7 +25,7 @@ export function Dashboard({ openMission, openReview }: { openMission: (id: strin
   const [y, m] = s.departure.split('-').map(Number);
   const monthsLeft = (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth());
   const nextMission = missions.find((x) => !s.missions[x.id]);
-  const week = lastDays(7).map((d) => Math.round((s.daily[d] ?? 0) / 60));
+  const week = lastDays(7).map((d) => Math.round((daily[d] ?? 0) / 60));
   const weekMin = week.reduce((a, b) => a + b, 0);
   const goal = s.dailyGoalMin;
 
@@ -175,7 +179,7 @@ export function Dashboard({ openMission, openReview }: { openMission: (id: strin
           </li>
         </ol>
       </section>
-      <p className="footer">Version {__APP_VERSION__} du {__APP_BUILT__}. Votre progression reste sur cet appareil.</p>
+      <p className="footer">Version {__APP_VERSION__} du {__APP_BUILT__}. {sync.connected ? (sync.state === 'error' ? 'Synchronisation en échec : voir « Mes phrases ».' : sync.lastSync ? `Synchronisé ${since(sync.lastSync)}.` : 'Synchronisation activée.') : 'Progression enregistrée sur cet appareil uniquement.'}</p>
     </div>
   );
 }

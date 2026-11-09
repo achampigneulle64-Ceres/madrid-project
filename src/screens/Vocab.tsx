@@ -3,6 +3,7 @@ import { State } from 'ts-fsrs';
 import { allChunks } from '../data/missions';
 import { Gendered, SpeakButton } from '../components/ui';
 import { VoiceSettings } from '../components/VoiceSettings';
+import { SyncSettings } from '../components/SyncSettings';
 import { exportBackup, importBackup, resetAll, useAppState } from '../lib/store';
 import { intervalLabel, isSolid } from '../lib/srs';
 
@@ -58,13 +59,18 @@ export function VocabScreen() {
       )}
 
       <section className="card">
+        <h2>Synchronisation</h2>
+        <SyncSettings />
+      </section>
+
+      <section className="card">
         <h2>Voix</h2>
         <VoiceSettings />
       </section>
 
       <section className="card">
         <h2>Sauvegarde</h2>
-        <p className="muted">Votre progression est stockée uniquement sur ce téléphone. Chaque semaine, exportez-la puis choisissez « Enregistrer dans Fichiers » → iCloud Drive.</p>
+        <p className="muted">Une copie de secours, utile même avec la synchronisation : exportez-la de temps en temps et choisissez « Enregistrer dans Fichiers » → iCloud Drive.</p>
         <div className="row">
           <button className="btn ghost grow" onClick={download}>Exporter</button>
           <button className="btn ghost grow" onClick={() => file.current?.click()}>Importer</button>

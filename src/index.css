@@ -352,3 +352,16 @@ b { font-weight: 650; }
 
 .retry { background: var(--albero-soft); border-radius: 10px; padding: 10px 12px; font-size: 14.5px; margin: 10px 0 0; }
 .stop-why { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+
+/* Synchronisation */
+.sync-state { display: flex; align-items: center; gap: 8px; font-weight: 650; margin: 10px 0 0; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.dot.ok { background: var(--ok); }
+.dot.syncing { background: var(--albero); }
+.dot.error { background: var(--ko); }
+.sync-msg { background: var(--ko-soft); color: var(--ko); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.sync-steps { padding-left: 20px; font-size: 14.5px; line-height: 1.55; color: var(--ink); }
+.sync-steps li { margin-bottom: 8px; }
+.sync-steps a { color: var(--cobalt); font-weight: 600; }
+.sync code { background: var(--paper); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+.small-link { font-size: 14px; margin-top: 14px; display: block; }

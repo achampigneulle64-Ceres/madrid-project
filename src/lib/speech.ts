@@ -47,6 +47,7 @@ function cleanName(v: SpeechSynthesisVoice) {
 }
 
 let voices: VoiceInfo[] = [];
+let lastSig = '';
 const listeners = new Set<() => void>();
 
 function refresh() {
@@ -71,7 +72,11 @@ function refresh() {
     })
     .filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)))
     .sort((a, b) => b.quality - a.quality || regionRank(a.lang) - regionRank(b.lang) || a.name.localeCompare(b.name));
-  listeners.forEach((l) => l());
+  const sig = voices.map((v) => v.id).join('|');
+  if (sig !== lastSig) {
+    lastSig = sig;
+    listeners.forEach((l) => l());
+  }
 }
 
 function regionRank(lang: string) {

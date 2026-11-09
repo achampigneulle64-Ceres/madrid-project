@@ -18,7 +18,10 @@ export interface AppState {
   voice?: { main?: string; second?: string; rate?: number };
   cards: Record<string, Card>;
   missions: Record<string, { completedAt: string; score: number }>;
-  daily: Record<string, number>; // AAAA-MM-JJ → secondes actives
+  /** Ancien format (un seul appareil) : migré vers devDaily. */
+  daily: Record<string, number>;
+  /** Temps actif par appareil : appareil → AAAA-MM-JJ → secondes. Permet d'additionner téléphone et ordinateur. */
+  devDaily?: Record<string, Record<string, number>>;
   errors: ErrorEvent[];
 }
 
@@ -33,12 +36,36 @@ function fresh(): AppState {
     cards: {},
     missions: {},
     daily: {},
+    devDaily: {},
     errors: [],
   };
 }
 
-function revive(raw: string): AppState {
+const DEVICE_KEY = 'madrid-espanol-device';
+let deviceIdMem: string | null = null;
+export function deviceId(): string {
+  if (deviceIdMem) return deviceIdMem;
+  try {
+    deviceIdMem = localStorage.getItem(DEVICE_KEY);
+    if (!deviceIdMem) {
+      deviceIdMem = Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(DEVICE_KEY, deviceIdMem);
+    }
+  } catch {
+    deviceIdMem = Math.random().toString(36).slice(2, 10);
+  }
+  return deviceIdMem;
+}
+
+export function revive(raw: string): AppState {
   const s = JSON.parse(raw) as AppState;
+  s.devDaily ??= {};
+  if (s.daily && Object.keys(s.daily).length) {
+    const mine = (s.devDaily[deviceId()] ??= {});
+    for (const [d, v] of Object.entries(s.daily)) mine[d] = Math.max(mine[d] ?? 0, v);
+    s.daily = {};
+  }
+  s.daily ??= {};
   for (const c of Object.values(s.cards)) {
     c.due = new Date(c.due);
     if (c.last_review) c.last_review = new Date(c.last_review);
@@ -64,9 +91,28 @@ export function getState() {
   return state;
 }
 
+const changeListeners = new Set<() => void>();
+/** Abonnement aux modifications faites par l'utilisateur (pas par la synchronisation). */
+export function onUserChange(fn: () => void) {
+  changeListeners.add(fn);
+  return () => {
+    changeListeners.delete(fn);
+  };
+}
+
 export function update(fn: (s: AppState) => void) {
   const next: AppState = structuredClone(state);
   fn(next);
+  commit(next);
+  changeListeners.forEach((l) => l());
+}
+
+/** Remplace l'état (après fusion avec une autre copie), sans déclencher de nouvelle synchronisation. */
+export function replaceState(next: AppState) {
+  commit(next);
+}
+
+function commit(next: AppState) {
   state = next;
   const raw = JSON.stringify(state);
   memory = raw;
@@ -108,7 +154,8 @@ export const today = (d = new Date()) =>
 export function addActiveSeconds(sec: number) {
   update((s) => {
     const k = today();
-    s.daily[k] = (s.daily[k] ?? 0) + sec;
+    const mine = ((s.devDaily ??= {})[deviceId()] ??= {});
+    mine[k] = (mine[k] ?? 0) + sec;
   });
 }
 
@@ -137,4 +184,48 @@ export function persistentDifficulties(s: AppState) {
   return [...byCat.entries()]
     .filter(([, b]) => b.n >= 3 && b.sessions.size >= 2)
     .map(([cat, b]) => ({ cat, n: b.n, items: [...b.items].slice(0, 3) }));
+}
+
+/** Temps actif par jour, tous appareils confondus. */
+export function dailyTotals(s: AppState): Record<string, number> {
+  const out: Record<string, number> = { ...s.daily };
+  for (const dev of Object.values(s.devDaily ?? {})) for (const [d, v] of Object.entries(dev)) out[d] = (out[d] ?? 0) + v;
+  return out;
+}
+
+/**
+ * Fusionne deux copies de la progression (ex. téléphone et ordinateur).
+ * Sans conflit : pour chaque phrase, la révision la plus récente l'emporte ;
+ * missions : meilleur score ; temps : maximum par appareil et par jour ; erreurs : union.
+ * Les réglages propres à l'appareil (voix, objectif) restent ceux de « local ».
+ */
+export function mergeStates(local: AppState, remote: AppState): AppState {
+  const out = structuredClone(local);
+  const t = (d?: Date) => (d ? new Date(d).getTime() : 0);
+  for (const [id, rc] of Object.entries(remote.cards ?? {})) {
+    const lc = out.cards[id];
+    if (!lc || t(rc.last_review) > t(lc.last_review) || (t(rc.last_review) === t(lc.last_review) && rc.reps > lc.reps)) out.cards[id] = rc;
+  }
+  for (const [id, rm] of Object.entries(remote.missions ?? {})) {
+    const lm = out.missions[id];
+    out.missions[id] = !lm ? rm : { completedAt: lm.completedAt < rm.completedAt ? lm.completedAt : rm.completedAt, score: Math.max(lm.score, rm.score) };
+  }
+  out.devDaily ??= {};
+  for (const [dev, days] of Object.entries(remote.devDaily ?? {})) {
+    const mine = (out.devDaily[dev] ??= {});
+    for (const [d, v] of Object.entries(days)) mine[d] = Math.max(mine[d] ?? 0, v);
+  }
+  const key = (e: ErrorEvent) => `${e.at}|${e.cat}|${e.item}`;
+  const seen = new Set(out.errors.map(key));
+  for (const e of remote.errors ?? []) if (!seen.has(key(e))) { out.errors.push(e); seen.add(key(e)); }
+  out.errors.sort((a, b) => a.at.localeCompare(b.at));
+  if (out.errors.length > 2000) out.errors = out.errors.slice(-2000);
+  if (remote.createdAt && remote.createdAt < out.createdAt) out.createdAt = remote.createdAt;
+  return out;
+}
+
+/** Version partagée (sans les réglages propres à l'appareil). */
+export function shareable(s: AppState) {
+  const { voice: _voice, ...rest } = s;
+  return rest;
 }

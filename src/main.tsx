@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { startUpdates } from './lib/update';
+import { startSync } from './lib/sync';
 
 startUpdates();
+startSync();
 
 // Demande au navigateur de ne pas effacer les données locales.
 navigator.storage?.persist?.().catch(() => {});

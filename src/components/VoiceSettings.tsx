@@ -55,6 +55,7 @@ export function VoiceSettings() {
             Sur l’iPhone : <i>Réglages → Accessibilité → Contenu énoncé → Voix → Espagnol</i>. Téléchargez une voix marquée
             <b> Premium</b> ou, à défaut, <b>Améliorée</b>, pour l’Espagne et pour le Mexique. Revenez ensuite ici : elle sera choisie automatiquement.
           </p>
+          <p>Sur Mac : <i>Réglages Système → Accessibilité → Contenu énoncé → Voix du système → Gérer les voix → Espagnol</i>.</p>
           <p className="small muted">Ces voix fonctionnent hors ligne et sont gratuites. Comptez 100 à 400 Mo par voix.</p>
         </div>
       )}
